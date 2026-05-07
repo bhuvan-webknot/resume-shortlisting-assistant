@@ -1,0 +1,12 @@
+John Doe
+Python Developer
+
+Experience:
+- 5 years of Python development
+- Built REST APIs using Flask and FastAPI
+- Strong SQL skills with PostgreSQL
+- Deployed apps on AWS (EC2, Lambda, S3)
+- Use Docker for containerization
+- Git for version control
+
+Skills: Python, SQL, AWS, Docker, REST APIs, Git, PostgreSQL

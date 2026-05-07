@@ -1,0 +1,11 @@
+Jane Smith
+Software Engineer
+
+Experience:
+- 2 years of Python experience
+- Basic SQL knowledge
+- Some AWS experience (S3 only)
+- Learning Docker
+- Familiar with Git
+
+Skills: Python, SQL, Git, JavaScript

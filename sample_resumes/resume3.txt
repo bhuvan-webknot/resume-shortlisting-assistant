@@ -1,0 +1,11 @@
+Mike Johnson
+Full Stack Developer
+
+Experience:
+- 4 years Python development
+- Extensive AWS experience (EC2, RDS, Lambda, CloudFormation)
+- Docker and Kubernetes
+- REST API design and implementation
+- Team lead experience
+
+Skills: Python, AWS, Docker, Kubernetes, REST APIs, Git, PostgreSQL, MongoDB

@@ -1,0 +1,12 @@
+Rachel Green
+Graphic Designer
+
+Experience:
+- 6 years of graphic design experience
+- Proficient in Adobe Creative Suite (Photoshop, Illustrator, InDesign)
+- Created brand identities and marketing materials
+- UI/UX design for mobile applications using Figma
+- Experience with web design basics (HTML/CSS)
+- No programming or database experience
+
+Skills: Adobe Photoshop, Illustrator, InDesign, Figma, HTML, CSS, UI/UX Design

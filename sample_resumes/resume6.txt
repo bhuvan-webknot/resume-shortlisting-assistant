@@ -1,0 +1,12 @@
+Emily Rodriguez
+DevOps Engineer
+
+Experience:
+- 7 years of DevOps and infrastructure engineering
+- Expert in AWS services (EC2, Lambda, ECS, CloudWatch)
+- Extensive Docker and Kubernetes experience
+- CI/CD pipeline design with Jenkins and GitHub Actions
+- Python scripting for automation
+- Strong SQL and database administration skills
+
+Skills: AWS, Docker, Kubernetes, Python, Terraform, CI/CD, SQL, Git, Linux

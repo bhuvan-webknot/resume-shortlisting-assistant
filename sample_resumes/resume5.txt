@@ -1,0 +1,12 @@
+David Wilson
+Frontend Developer
+
+Experience:
+- 3 years of React and JavaScript development
+- Built responsive web applications
+- Experience with CSS, HTML, and TypeScript
+- Familiar with REST API integration
+- Basic Python knowledge from college
+- Used Git for version control
+
+Skills: JavaScript, React, TypeScript, CSS, HTML, Git, REST APIs

@@ -1,0 +1,12 @@
+Sarah Chen
+Data Scientist
+
+Experience:
+- 6 years of Python development for data science
+- Built ML models using scikit-learn and TensorFlow
+- Strong SQL skills for data extraction
+- Experience with AWS (S3, SageMaker, EMR)
+- Data visualization with matplotlib and seaborn
+- Git for version control
+
+Skills: Python, SQL, AWS, Machine Learning, TensorFlow, Git, Pandas, NumPy

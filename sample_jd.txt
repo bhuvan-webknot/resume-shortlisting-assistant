@@ -1,0 +1,16 @@
+Job Title: Python Developer
+
+Requirements:
+- 3+ years of Python experience
+- Strong knowledge of SQL and databases
+- Experience with AWS cloud services
+- Familiarity with Docker and containerization
+- Good understanding of REST APIs
+- Experience with Git version control
+
+Responsibilities:
+- Develop and maintain Python applications
+- Design and implement REST APIs
+- Work with SQL databases
+- Deploy applications on AWS
+- Collaborate with cross-functional teams

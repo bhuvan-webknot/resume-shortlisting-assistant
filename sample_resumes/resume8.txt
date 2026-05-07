@@ -1,0 +1,13 @@
+Alex Kumar
+Backend Developer
+
+Experience:
+- 4 years of backend development with Python
+- Built scalable microservices using FastAPI and Flask
+- Designed and implemented REST APIs
+- PostgreSQL and MySQL database expertise
+- Docker containerization and AWS deployment
+- Redis caching and Celery for async tasks
+- Git version control and agile methodologies
+
+Skills: Python, FastAPI, Flask, REST APIs, PostgreSQL, MySQL, AWS, Docker, Redis, Git

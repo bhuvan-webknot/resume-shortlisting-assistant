@@ -1,0 +1,68 @@
+[DEBUG] Setting intent to match...
+[DEBUG] Extracting skills from JD using LLM...
+[DEBUG] Extracted skills: ['Python', 'SQL', 'Databases', 'AWS', 'Docker', 'Containerization', 'REST APIs', 'Git']
+[DEBUG] Starting resume retrieval...
+Loading resumes from: sample_resumes/
+Loaded TXT: resume1.txt (312 chars)
+Loaded TXT: resume2.txt (203 chars)
+Loaded TXT: resume3.txt (300 chars)
+Total documents loaded: 3
+[DEBUG] Retrieved 3 docs
+[DEBUG] Generating final response...
+
+============================================================
+RESUME SHORTLISTING RESULTS
+============================================================
+
+JD Summary: Job Title: Python Developer
+
+Requirements:
+- 3+ years of Python experience
+- Strong knowledge of SQL and databases
+- Experience with AWS cloud services
+- Familiarity with Docker and containerization
+-
+Total Resumes Processed: 3
+
+Extracted JD Skills: Python, SQL, Databases, AWS, Docker, Containerization, REST APIs, Git
+
+Shortlist Criteria: Here is a summary of the top candidates for the Python Developer position:
+
+**1. John Doe (Score: 0.88) – Best Fit**
+John is the strongest candidate, matching nearly every requirement and skill listed. He possesses the core Python and SQL foundation, along with the specific cloud (AWS) and infrastru
+
+Top Candidates:
+
+1. John Doe
+   Match Score: 0.88
+   Matched Skills: Python, SQL, AWS, Docker, Containerization, REST APIs, Git
+   Missing Skills: Databases
+   Summary: John Doe
+Python Developer
+
+Experience:
+- 5 years of Python development
+- Built REST APIs using Flask...
+
+2. Mike Johnson
+   Match Score: 0.75
+   Matched Skills: Python, SQL, AWS, Docker, REST APIs, Git
+   Missing Skills: Databases, Containerization
+   Summary: Mike Johnson
+Full Stack Developer
+
+Experience:
+- 4 years Python development
+- Extensive AWS experien...
+
+3. Jane Smith
+   Match Score: 0.62
+   Matched Skills: Python, SQL, AWS, Docker, Git
+   Missing Skills: Databases, Containerization, REST APIs
+   Summary: Jane Smith
+Software Engineer
+
+Experience:
+- 2 years of Python experience
+- Basic SQL knowledge
+- Som...
