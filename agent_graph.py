@@ -1,17 +1,13 @@
 import json
 import re
 import logging
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import List, Optional, TypedDict
 
 from langgraph.graph import StateGraph, END
 from langchain_core.prompts import PromptTemplate
 
 from schemas import (
-    IntentClassification, DecisionOutput, RankedCandidate, FinalResponse, ToolOutput
-)
-from tools import (
-    RetrievalTool, ScoringTool, SearchTool,
-    register_tool, get_tool, TOOL_REGISTRY
+    IntentClassification, DecisionOutput, RankedCandidate, FinalResponse
 )
 
 import os
@@ -33,7 +29,6 @@ class AgentState(TypedDict):
     retrieved_docs: List[str]
     ranked_candidates: List[RankedCandidate]
     final_response: Optional[FinalResponse]
-    tool_output: Optional[ToolOutput]
     query: str
     decisions_log: List[str]
 
@@ -58,7 +53,7 @@ def classify_intent(state: AgentState) -> AgentState:
         'Job Description (first 300 chars): {jd}\n\n'
         'JSON:'
     )
-    try:
+    try:        
         result = (prompt | llm).invoke({
             "query": state.get("query", "Shortlist candidates for this job"),
             "jd": state["jd_content"][:300]
@@ -100,35 +95,21 @@ def extract_jd_skills(state: AgentState) -> AgentState:
 
 
 def decide_action(state: AgentState) -> AgentState:
-    tools_desc = "\n".join([
-        f"- {name}: {t.description} (input: {t.input_schema()})"
-        for name, t in TOOL_REGISTRY.items()
-    ])
-
     prompt = PromptTemplate.from_template(
         'You are a decision router for a resume shortlisting agent. '
         'Decide what action to take next.\n\n'
         'Intent: {intent}\n'
-        'JD Skills: {skills}\n'
-        'Available Tools:\n{tools}\n\n'
+        'JD Skills: {skills}\n\n'
         'Choose action:\n'
         '- direct: Answer directly from LLM knowledge (for summaries, general questions)\n'
-        '- retrieve: Retrieve resumes from the vector database (for finding/screening candidates)\n'
-        '- tool: Use a specific tool (for scoring, web search)\n\n'
-        'If action is \'tool\', specify which tool_name and the tool_input parameters.\n\n'
-        'Return JSON: {{'
-        '"action": "direct|retrieve|tool", '
-        '"tool_name": null or "retrieval|scoring|search", '
-        '"tool_input": {{}} or {{"query": "...", "k": 5, "required_skills": [...], "candidate_docs": [...]}}, '
-        '"reasoning": "..."'
-        '}}\n\n'
+        '- retrieve: Retrieve resumes from the vector database (for matching, screening, or comparing candidates)\n\n'
+        'Return JSON: {{"action": "direct|retrieve", "reasoning": "..."}}\n\n'
         'JSON:'
     )
     try:
         result = (prompt | llm).invoke({
             "intent": state["intent"].intent,
             "skills": ", ".join(state.get("jd_skills", [])),
-            "tools": tools_desc
         })
         content = _clean_llm_json(result.content if hasattr(result, 'content') else str(result))
         parsed = json.loads(content)
@@ -137,7 +118,7 @@ def decide_action(state: AgentState) -> AgentState:
         logger.warning(f"Decision failed: {e}, defaulting to retrieve")
         state["decision"] = DecisionOutput(action="retrieve", reasoning="Fallback to retrieve")
 
-    state["decisions_log"].append(f"Decision: {state['decision'].action} -> {state['decision'].tool_name or 'N/A'}")
+    state["decisions_log"].append(f"Decision: {state['decision'].action}")
     logger.info(f"Decision: {state['decision'].model_dump()}")
     return state
 
@@ -150,55 +131,15 @@ def retrieve_resumes(state: AgentState) -> AgentState:
     if rag.vector_store is None:
         state["retrieved_docs"] = []
         return state
-    docs = rag.retrieve_relevant(state["jd_content"], k=5, use_hybrid=True, rerank=False)
+    query = state.get("query", state["jd_content"])
+    k = 10 if state.get("intent") and state["intent"].intent == "compare" else 5
+    docs = rag.retrieve_relevant(query, k=k, use_hybrid=True, rerank=False)
     state["retrieved_docs"] = [d.page_content for d in docs]
     logger.info(f"Retrieved {len(state['retrieved_docs'])} documents")
     return state
 
 
-def execute_tool(state: AgentState) -> AgentState:
-    tool_name = state["decision"].tool_name
-    tool_input = state["decision"].tool_input or {}
-    logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
 
-    tool = get_tool(tool_name)
-    if not tool:
-        logger.error(f"Unknown tool: {tool_name}")
-        state["tool_output"] = ToolOutput(tool_name=tool_name, success=False, result={}, error=f"Unknown tool: {tool_name}")
-        return state
-
-    if tool_name == "retrieval":
-        from rag_system import ResumeRAG
-        rag = ResumeRAG()
-        rag.load_and_index(state["resume_dir"])
-        if rag.vector_store:
-            state["retrieved_docs"] = [d.page_content for d in rag.retrieve_relevant(
-                tool_input.get("query", state["jd_content"]),
-                k=tool_input.get("k", 5),
-                use_hybrid=True
-            )]
-        tool_output = tool.run(query=tool_input.get("query", state["jd_content"]),
-                               k=tool_input.get("k", 5))
-    elif tool_name == "scoring":
-        docs = tool_input.get("candidate_docs", state.get("retrieved_docs", []))
-        skills = tool_input.get("required_skills", state.get("jd_skills", []))
-        tool_output = tool.run(required_skills=skills, candidate_docs=docs)
-        if tool_output.success:
-            state["ranked_candidates"] = [
-                RankedCandidate(**c) for c in tool_output.ranked_candidates
-            ]
-    elif tool_name == "search":
-        tool_output = tool.run(query=tool_input.get("query", ""),
-                                max_results=tool_input.get("max_results", 3))
-    else:
-        tool_output = ToolOutput(tool_name=tool_name, success=False, result={}, error="Unimplemented")
-
-    state["tool_output"] = tool_output
-    state["decisions_log"].append(
-        f"Tool result: {tool_name} {'succeeded' if tool_output.success else 'failed'}"
-    )
-    logger.info(f"Tool {tool_name} result: success={tool_output.success}")
-    return state
 
 
 def generate_response(state: AgentState) -> AgentState:
@@ -225,25 +166,47 @@ def generate_response(state: AgentState) -> AgentState:
         state["ranked_candidates"] = candidates
 
     candidates = state.get("ranked_candidates", [])
+    intent = state["intent"].intent if state.get("intent") else "match"
+
+    if intent == "compare":
+        query_lower = state.get("query", "").lower()
+        filtered = [c for c in candidates if c.candidate_name.lower() in query_lower]
+        if filtered:
+            candidates = filtered
 
     try:
-        response_prompt = PromptTemplate.from_template(
-            "Summarize the shortlisting results.\n\n"
-            "JD summary: {jd_summary}\n"
-            "Required skills: {skills}\n"
-            "Decision trace: {decisions_log}\n\n"
-            "Top candidates:\n{candidates}\n\n"
-            "Provide a brief shortlist summary:"
-        )
-        result = (response_prompt | llm).invoke({
+        if intent == "compare":
+            response_prompt = PromptTemplate.from_template(
+                "Compare the following candidates for the job.\n\n"
+                "User query: {query}\n"
+                "JD summary: {jd_summary}\n"
+                "Required skills: {skills}\n"
+                "Decision trace: {decisions_log}\n\n"
+                "Candidates to compare:\n{candidates}\n\n"
+                "Provide a detailed side-by-side comparison of these candidates, "
+                "highlighting each one's strengths and weaknesses relative to the job requirements:"
+            )
+        else:
+            response_prompt = PromptTemplate.from_template(
+                "Summarize the shortlisting results.\n\n"
+                "JD summary: {jd_summary}\n"
+                "Required skills: {skills}\n"
+                "Decision trace: {decisions_log}\n\n"
+                "Top candidates:\n{candidates}\n\n"
+                "Provide a brief shortlist summary:"
+            )
+        invoke_args = {
             "jd_summary": state["jd_content"][:200],
             "skills": ", ".join(state.get("jd_skills", [])),
             "decisions_log": "; ".join(state.get("decisions_log", [])),
             "candidates": "\n".join([
                 f"- {c.candidate_name}: {c.match_score:.0%} - Matched: {', '.join(c.matched_skills)}"
-                for c in candidates[:5]
+                for c in candidates
             ])
-        })
+        }
+        if intent == "compare":
+            invoke_args["query"] = state.get("query", "")
+        result = (response_prompt | llm).invoke(invoke_args)
         criteria = result.content if hasattr(result, 'content') else str(result)
         criteria = criteria[:400]
     except Exception as e:
@@ -253,7 +216,7 @@ def generate_response(state: AgentState) -> AgentState:
     state["final_response"] = FinalResponse(
         jd_summary=state["jd_content"][:200],
         total_resumes_processed=len(state.get("retrieved_docs", [])),
-        shortlisted_candidates=candidates[:5],
+        shortlisted_candidates=candidates,
         shortlist_criteria=criteria,
         decisions_log=state.get("decisions_log", [])
     )
@@ -265,16 +228,11 @@ def should_retrieve(state: AgentState) -> str:
 
 
 def build_graph():
-    register_tool(RetrievalTool(None))
-    register_tool(ScoringTool(llm=llm))
-    register_tool(SearchTool())
-
     workflow = StateGraph(AgentState)
     workflow.add_node("classify", classify_intent)
     workflow.add_node("extract_skills", extract_jd_skills)
     workflow.add_node("decide", decide_action)
     workflow.add_node("retrieve", retrieve_resumes)
-    workflow.add_node("tool_node", execute_tool)
     workflow.add_node("respond", generate_response)
 
     workflow.set_entry_point("classify")
@@ -284,20 +242,12 @@ def build_graph():
     workflow.add_conditional_edges(
         "decide", should_retrieve, {
             "retrieve": "retrieve",
-            "tool": "tool_node",
             "direct": "respond"
         }
     )
 
     workflow.add_edge("retrieve", "respond")
-    workflow.add_edge("tool_node", "respond")
     workflow.add_edge("respond", END)
 
     graph = workflow.compile()
-
-    retrieval_tool = get_tool("retrieval")
-    if retrieval_tool:
-        from rag_system import ResumeRAG
-        retrieval_tool.rag = ResumeRAG()
-
     return graph

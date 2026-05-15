@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 def main():
     if len(sys.argv) < 3:
         print("Usage: python main.py <jd_file_path> <resume_dir_path> [query]")
-        print("  query: optional natural language query (default: 'Shortlist candidates')")
         sys.exit(1)
 
     jd_path = sys.argv[1]
@@ -34,7 +33,6 @@ def main():
         retrieved_docs=[],
         ranked_candidates=[],
         final_response=None,
-        tool_output=None,
         query=query,
         decisions_log=[]
     )
@@ -42,18 +40,26 @@ def main():
     result = graph.invoke(initial_state)
     response = result["final_response"]
 
+    intent = result.get("intent")
+    intent_label = intent.intent if intent else "match"
+
     print("\n" + "=" * 60)
-    print("RESUME SHORTLISTING RESULTS")
+    if intent_label == "compare":
+        print("CANDIDATE COMPARISON RESULTS")
+    else:
+        print("RESUME SHORTLISTING RESULTS")
     print("=" * 60)
     print(f"\nQuery: {query}")
+    print(f"Intent: {intent_label}")
     print(f"JD Summary: {response.jd_summary}")
     print(f"Total Resumes Processed: {response.total_resumes_processed}")
     print(f"\nExtracted JD Skills: {', '.join(result.get('jd_skills', []))}")
-    print(f"\nDecision Trace:")
-    for step in response.decisions_log:
-        print(f"  -> {step}")
+
     print(f"\nShortlist Criteria: {response.shortlist_criteria}")
-    print("\nTop Candidates:")
+    if intent_label == "compare":
+        print("\nCandidates Compared:")
+    else:
+        print("\nTop Candidates:")
     for i, c in enumerate(response.shortlisted_candidates, 1):
         print(f"\n  {i}. {c.candidate_name}")
         print(f"     Match Score: {c.match_score:.2f}")
