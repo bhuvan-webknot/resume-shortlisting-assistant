@@ -1,0 +1,277 @@
+============================================================
+  AI RESUME SHORTLISTER — KNOWLEDGE TRANSFER GUIDE
+============================================================
+
+1. PROJECT OVERVIEW
+--------------------
+An agentic AI system that automates resume screening using LangGraph
+(orchestration) + RAG (retrieval). Given a job description and a folder
+of resumes, it extracts skills, retrieves relevant candidates via vector
+search, scores them, and produces a ranked shortlist.
+
+Tech stack: Python, LangGraph, LangChain, ChromaDB, Google Gemini,
+            sentence-transformers, HuggingFace embeddings.
+
+Entry point: main.py
+CLI: python main.py <jd_file> <resume_dir> [query]
+
+
+2. PROJECT STRUCTURE
+---------------------
+File              Purpose
+───────           ─────────
+main.py           CLI entry point. Reads args, loads JD, invokes the
+                  LangGraph pipeline, prints results.
+
+agent_graph.py    Core orchestration. Defines the LangGraph StateGraph
+                  with 6 nodes + conditional edges. This is the "brain".
+
+rag_system.py     Resume RAG engine. Loads resumes, chunks them, creates
+                  a ChromaDB vector store in-memory, does hybrid search
+                  (embedding similarity + BM25 keyword).
+
+schemas.py        Pydantic models for structured data: AgentState,
+                  IntentClassification, DecisionOutput, RankedCandidate,
+                  FinalResponse, ToolInput/Output variants.
+
+tools.py          Tool abstraction layer with BaseTool interface and 3
+                  concrete tools: RetrievalTool, ScoringTool, SearchTool.
+                  Has a simple TOOL_REGISTRY dict.
+
+test_queries.py   Test suite covering unit tests (schemas, registry, RAG,
+                  tools) and one full pipeline integration test (requires
+                  GOOGLE_API_KEY). Run: python test_queries.py [--llm]
+
+requirements.txt  Dependencies. Key ones: langgraph, langchain-google-genai,
+                  langchain-huggingface, chromadb, sentence-transformers.
+
+sample_jd.txt     Sample job description for testing.
+sample_resumes/   9 sample resume TXT files for testing.
+output.txt        Sample output from a previous run.
+FLOW.md           Detailed flow documentation with data state diagrams.
+
+
+3. ARCHITECTURE — HOW IT WORKS
+-------------------------------
+A. THE LANGGRAPH PIPELINE (agent_graph.py)
+
+   The pipeline is a StateGraph with the following nodes:
+
+   classify ──► extract_skills ──► decide ──► retrieve ──► respond ──► END
+                                                      │
+                                                    tool_node
+                                                      │
+                                                    respond
+
+   Node-by-node:
+
+   Node 1: classify_intent
+     - Calls Gemini to classify the user query into: match, summarize,
+       compare, direct_query.
+     - On failure, defaults to "match".
+     - Writes to: state["intent"]
+
+   Node 2: extract_jd_skills
+     - Calls Gemini with a prompt to extract technical skills from JD as
+       JSON list.
+     - Post-processing: strips markdown fences, parses JSON, cleans skills
+       (1-3 words max, limit 15).
+     - Writes to: state["jd_skills"]
+
+   Node 3: decide_action
+     - Calls Gemini to decide next action: "retrieve", "tool", or "direct".
+     - If "tool", also picks which tool (retrieval/scoring/search) and the
+       tool input parameters.
+     - Fallback: "retrieve" if LLM call fails.
+     - Writes to: state["decision"]
+
+   Conditional edge (should_retrieve):
+     - Routes to "retrieve" node if action=retrieve
+     - Routes to "tool_node" if action=tool
+     - Routes to "respond" if action=direct
+
+   Node 4: retrieve_resumes
+     - Instantiates ResumeRAG, loads and indexes all resumes in ChromaDB.
+     - Retrieves top-5 most relevant chunks via hybrid search (embedding
+       similarity weighted with BM25 keyword scores).
+     - Writes to: state["retrieved_docs"]
+
+   Node 5 (tool_node): execute_tool
+     - Executes the tool specified in state["decision"].
+     - Three tools available (see §5):
+       - retrieval: RAG search (can re-query with different params)
+       - scoring:    scores candidates against required skills
+       - search:     web search via DuckDuckGo
+     - Writes to: state["tool_output"] (and may update retrieved_docs,
+       ranked_candidates).
+
+   Node 6: generate_response
+     - If ranked_candidates is empty but retrieved_docs exist: does substring
+       matching (case-insensitive) of each required skill against each resume
+       text, computes match_score = matched/total, sorts descending.
+     - Calls Gemini for a shortlist summary paragraph.
+     - Assembles FinalResponse with jd_summary, total count, top-5
+       candidates, criteria, decisions_log.
+     - Writes to: state["ranked_candidates"], state["final_response"]
+
+B. THE AGENT STATE (AgentState TypedDict)
+
+   Shared state object flowing through the graph:
+
+   Field                Type                Set by
+   ─────                ────                ──────
+   jd_content           str                 main.py
+   resume_dir           str                 main.py
+   query                str                 main.py
+   jd_skills            List[str]           extract_skills
+   intent               IntentClassification  classify
+   decision             DecisionOutput      decide
+   retrieved_docs       List[str]           retrieve / tool_node
+   ranked_candidates    List[RankedCandidate] respond / tool_node
+   final_response       FinalResponse       respond
+   tool_output          ToolOutput          tool_node
+   decisions_log        List[str]           all nodes (appended)
+
+
+4. RAG SYSTEM (rag_system.py)
+-------------------------------
+Class: ResumeRAG
+
+Key flow:
+  1. load_resumes(dir) — reads .txt and .pdf files, wraps as LangChain Documents
+  2. create_vector_store(docs) — splits into chunks (500 chars, 100 overlap)
+     using RecursiveCharacterTextSplitter, embeds with HuggingFace
+     (all-MiniLM-L6-v2, 384-dim), stores in in-memory ChromaDB.
+  3. retrieve_relevant(query, k=5, use_hybrid=True, rerank=False):
+     - Does similarity_search_with_relevance_scores (cosine similarity)
+     - If hybrid: combines embedding scores + BM25 keyword scores (alpha=0.7)
+     - If rerank: loads cross-encoder/ms-marco-MiniLM-L-6-v2 for re-ranking
+     - Returns top-k Document objects with metadata["score"]
+
+   Hybrid search formula: score = 0.7 * emb_score + 0.3 * bm25_score
+
+   Cross-encoder reranking is available but DISABLED by default (expensive).
+
+   Vector store is rebuilt from scratch on every run (no persistence).
+
+
+5. TOOL SYSTEM (tools.py)
+---------------------------
+Interface: BaseTool (abstract)
+  - name, description, run(), input_schema()
+  - Registry: TOOL_REGISTRY dict, register_tool(), get_tool(), list_tools()
+
+Three tools:
+
+  A. RetrievalTool
+     - Uses ResumeRAG to search and retrieve relevant resume documents.
+     - Input: query (str), k (int, default 5)
+     - Output: RetrievalToolOutput with documents, scores, sources.
+
+  B. ScoringTool
+     - Scores candidates against required skills using substring matching.
+     - Input: required_skills (List[str]), candidate_docs (List[str])
+     - Output: ScoringToolOutput with ranked_candidates sorted by score desc.
+     - Score = matched_skills / total_required_skills
+
+  C. SearchTool
+     - Web search via DuckDuckGo API (no API key needed).
+     - Input: query (str), max_results (int, default 3)
+     - Output: SearchToolOutput with results[title, snippet].
+     - Has in-memory cache. Non-critical — failures are logged as warnings.
+
+
+6. DATA MODELS (schemas.py)
+-----------------------------
+IntentClassification: intent, confidence, reasoning
+DecisionOutput:       action, tool_name?, tool_input?, reasoning
+ToolOutput:           tool_name, success, result, error?
+RetrievalToolOutput:  extends ToolOutput with documents[], scores[], sources[]
+ScoringToolOutput:    extends ToolOutput with ranked_candidates[], summary
+SearchToolOutput:     extends ToolOutput with results[]
+RankedCandidate:      candidate_name, match_score, matched_skills[],
+                      missing_skills[], summary
+FinalResponse:        jd_summary, total_resumes_processed,
+                      shortlisted_candidates[], shortlist_criteria,
+                      decisions_log[]
+
+Tool inputs are validated with pydantic:
+  RetrievalToolInput: query, k (1-20)
+  ScoringToolInput:   required_skills[], candidate_docs[]
+  SearchToolInput:    query, max_results (1-10)
+
+
+7. CONFIGURATION
+-----------------
+.env: GOOGLE_API_KEY=your-key-here  (required for Gemini)
+
+.gitignore excludes: .venv/, .env, chroma_resumes/
+
+The model used: gemini-flash-latest (temperature=0.0 for deterministic output).
+To switch models, change line 24 of agent_graph.py.
+
+
+8. HOW TO RUN
+--------------
+  pip install -r requirements.txt
+  # Set GOOGLE_API_KEY in .env
+  python main.py sample_jd.txt sample_resumes/
+  # Or: python main.py sample_jd.txt sample_resumes/ "Find me Python experts"
+  # Run tests:
+  python test_queries.py            # unit tests only
+  python test_queries.py --llm      # includes full pipeline (needs API key)
+
+
+9. EXTENSION POINTS
+--------------------
+- Swap LLM:  Change ChatGoogleGenerativeAI to ChatOpenAI, ChatAnthropic, etc.
+- Swap embedder:  Change HuggingFaceEmbeddings to OpenAIEmbeddings.
+- Better scoring:  Replace substring matching with LLM-based skill evaluation
+  or a proper NER/entity extraction approach.
+- Persistent vector store:  Set persist_directory in Chroma to save between runs.
+- Add new nodes:  Define a function(state) -> state, then add_node + add_edge.
+- Add tools:  Subclass BaseTool, implement run() and input_schema(), register
+  with register_tool().
+- UI:  Currently CLI-only. Could wrap the graph.invoke() call in FastAPI/Streamlit.
+- Looping/refinement:  Add a conditional edge that goes back to an earlier node.
+
+
+10. KNOWN LIMITATIONS / CAVEATS
+--------------------------------
+- Scoring is naive substring matching (case-insensitive). "AWS" in JD matches
+  "AWS" anywhere in resume text, no context understanding.
+- Vector store is rebuilt every run (no persistence). Slow for large resume sets.
+- SearchTool uses DuckDuckGo's free API — no guarantee of quality/availability.
+- Cross-encoder reranking requires downloading ~500MB model on first use.
+- Intent classification falls back to "match" on any failure (silent degradation).
+- LLM calls in classify, extract_skills, decide, and respond = 4 Gemini calls
+  per pipeline run. Each call adds latency and cost.
+- No authentication, no database, no production hardening — this is a prototype.
+- The tool_node path (action="tool") works but is less tested than the main
+  retrieve path.
+
+
+11. TROUBLESHOOTING
+-------------------
+Problem:  "ModuleNotFoundError: No module named 'langgraph'"
+Fix:      pip install -r requirements.txt
+
+Problem:  "Google API key not found"
+Fix:      Make sure .env exists with GOOGLE_API_KEY=your-key
+
+Problem:  "No candidates shortlisted"
+Check:    Ensure resume_dir has .txt or .pdf files. Check that JD text is not
+          empty. Verify Gemini returned skills (check logs).
+
+Problem:  "LLM response parsing failed" warnings
+Fix:      Usually a transient JSON formatting issue from Gemini. Re-run. If
+          persistent, check the _clean_llm_json() function in agent_graph.py.
+
+Problem:  ChromaDB errors about dimensionality mismatch
+Fix:      The embedding model outputs 384-dim vectors. If you've swapped models
+          mid-session, clear chroma_resumes/ directory if it exists.
+
+
+============================================================
+  End of KT Guide
+============================================================

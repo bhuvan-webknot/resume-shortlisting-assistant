@@ -1,14 +1,20 @@
 import sys
+import logging
 from agent_graph import build_graph, AgentState
-from schemas import FinalResponse
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
+logger = logging.getLogger(__name__)
+
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python main.py <jd_file_path> <resume_dir_path>")
+        print("Usage: python main.py <jd_file_path> <resume_dir_path> [query]")
+        print("  query: optional natural language query (default: 'Shortlist candidates')")
         sys.exit(1)
 
     jd_path = sys.argv[1]
     resume_dir = sys.argv[2]
+    query = sys.argv[3] if len(sys.argv) > 3 else "Shortlist the best candidates for this job"
 
     if jd_path.endswith(".pdf"):
         from langchain_community.document_loaders import PyPDFLoader
@@ -27,27 +33,35 @@ def main():
         decision=None,
         retrieved_docs=[],
         ranked_candidates=[],
-        final_response=None
+        final_response=None,
+        tool_output=None,
+        query=query,
+        decisions_log=[]
     )
 
     result = graph.invoke(initial_state)
-
     response = result["final_response"]
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("RESUME SHORTLISTING RESULTS")
-    print("="*60)
-    print(f"\nJD Summary: {response.jd_summary}")
+    print("=" * 60)
+    print(f"\nQuery: {query}")
+    print(f"JD Summary: {response.jd_summary}")
     print(f"Total Resumes Processed: {response.total_resumes_processed}")
     print(f"\nExtracted JD Skills: {', '.join(result.get('jd_skills', []))}")
+    print(f"\nDecision Trace:")
+    for step in response.decisions_log:
+        print(f"  -> {step}")
     print(f"\nShortlist Criteria: {response.shortlist_criteria}")
     print("\nTop Candidates:")
     for i, c in enumerate(response.shortlisted_candidates, 1):
-        print(f"\n{i}. {c.candidate_name}")
-        print(f"   Match Score: {c.match_score:.2f}")
-        print(f"   Matched Skills: {', '.join(c.matched_skills) if c.matched_skills else 'None'}")
-        print(f"   Missing Skills: {', '.join(c.missing_skills) if c.missing_skills else 'None'}")
-        print(f"   Summary: {c.summary[:100]}...")
-    print("\n" + "="*60)
+        print(f"\n  {i}. {c.candidate_name}")
+        print(f"     Match Score: {c.match_score:.2f}")
+        print(f"     Matched Skills: {', '.join(c.matched_skills) if c.matched_skills else 'None'}")
+        print(f"     Missing Skills: {', '.join(c.missing_skills) if c.missing_skills else 'None'}")
+        print(f"     Summary: {c.summary[:100]}...")
+    print("\n" + "=" * 60)
+
 
 if __name__ == "__main__":
     main()
