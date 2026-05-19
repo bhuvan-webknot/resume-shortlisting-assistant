@@ -1,4 +1,5 @@
 import sys
+import os
 import logging
 from agent_graph import build_graph, AgentState
 
@@ -6,14 +7,38 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def _is_gdrive_input(path: str) -> bool:
+    if os.path.exists(path):
+        return False
+    return (
+        path.startswith("http") or
+        path.startswith("drive.google.com") or
+        (len(path) >= 25 and "/" not in path and "\\" not in path)
+    )
+
+
+def resolve_resume_source(resume_input: str) -> str:
+    if _is_gdrive_input(resume_input):
+        logger.info("Input looks like a Google Drive folder — downloading resumes...")
+        from google_drive import download_resumes_from_drive
+        return download_resumes_from_drive(resume_input)
+    return resume_input
+
+
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python main.py <jd_file_path> <resume_dir_path> [query]")
+        print("Usage: python main.py <jd_file_path> <resume_dir_or_gdrive_url> [query]")
+        print("  <resume_dir_or_gdrive_url> can be:")
+        print("    - A local directory path")
+        print("    - A Google Drive folder URL or folder ID")
         sys.exit(1)
 
     jd_path = sys.argv[1]
-    resume_dir = sys.argv[2]
+    resume_input = sys.argv[2]
     query = sys.argv[3] if len(sys.argv) > 3 else "Shortlist the best candidates for this job"
+
+    resume_dir = resolve_resume_source(resume_input)
+    logger.info(f"Resume source: {resume_dir}")
 
     if jd_path.endswith(".pdf"):
         from langchain_community.document_loaders import PyPDFLoader

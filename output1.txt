@@ -1,0 +1,166 @@
+INFO | Intent: {'intent': 'match', 'confidence': 0.98, 'reasoning': "The user's request to 'shortlist the best candidates' for a specific job description is a clear instruction to perform a matching operation between a pool of candidates and the provided job requirements."}
+INFO | Extracting skills from JD using LLM...
+INFO | Extracted 8 skills
+INFO | Decision: {'action': 'retrieve', 'reasoning': "The 'match' intent combined with a list of specific JD skills indicates a need to find and screen candidates from the existing pool of resumes, which requires a vector database lookup."}
+INFO | Retrieving resumes via RAG...
+INFO | Use pytorch device_name: mps
+INFO | Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+INFO | Loading resumes from: sample_resumes/
+INFO | Loaded TXT: resume1.txt (312 chars)
+INFO | Loaded TXT: resume2.txt (203 chars)
+INFO | Loaded TXT: resume3.txt (300 chars)
+INFO | Loaded TXT: resume4.txt (374 chars)
+INFO | Loaded TXT: resume5.txt (343 chars)
+INFO | Loaded TXT: resume6.txt (411 chars)
+INFO | Loaded TXT: resume7.txt (386 chars)
+INFO | Loaded TXT: resume8.txt (442 chars)
+INFO | Loaded TXT: resume9.txt (423 chars)
+INFO | Total documents loaded: 9
+
+INFO | Retrieved 5 documents
+INFO | Generating final response...
+
+============================================================
+RESUME SHORTLISTING RESULTS
+============================================================
+
+Query: Shortlist the best candidates for this job
+JD Summary: Job Title: Python Developer
+
+Requirements:
+- 3+ years of Python experience
+- Strong knowledge of SQL and databases
+- Experience with AWS cloud services
+- Familiarity with Docker and containerization
+-
+Total Resumes Processed: 5
+
+Extracted JD Skills: Python, SQL, Databases, AWS, Docker, Containerization, REST APIs, Git
+
+Decision Trace:
+  -> Intent: match (0.98)
+  -> Decision: retrieve
+
+Shortlist Criteria: Based on the job requirements for the **Python Developer** role, here is a summary of the shortlisting results:
+
+### **Shortlist Overview**
+A total of five candidates were evaluated against the core requirements (Python, SQL, AWS, Docker, REST APIs, and Git). 
+
+*   **Top Tier (88% Match):** 
+    *   **John Doe** and **Alex Kumar** are the leading candidates. Both demonstrate a comprehensive match 
+
+Top Candidates:
+
+  1. John Doe
+     Match Score: 0.88
+     Matched Skills: Python, SQL, AWS, Docker, Containerization, REST APIs, Git
+     Missing Skills: Databases
+     Summary: John Doe
+Python Developer
+
+Experience:
+- 5 years of Python development
+- Built REST APIs using Flask...
+
+  2. Alex Kumar
+     Match Score: 0.88
+     Matched Skills: Python, SQL, AWS, Docker, Containerization, REST APIs, Git
+     Missing Skills: Databases
+     Summary: Alex Kumar
+Backend Developer
+
+Experience:
+- 4 years of backend development with Python
+- Built scala...
+
+  3. Mike Johnson
+     Match Score: 0.75
+     Matched Skills: Python, SQL, AWS, Docker, REST APIs, Git
+     Missing Skills: Databases, Containerization
+     Summary: Mike Johnson
+Full Stack Developer
+
+Experience:
+- 4 years Python development
+- Extensive AWS experien...
+
+  4. Jane Smith
+     Match Score: 0.62
+     Matched Skills: Python, SQL, AWS, Docker, Git
+     Missing Skills: Databases, Containerization, REST APIs
+     Summary: Jane Smith
+Software Engineer
+
+Experience:
+- 2 years of Python experience
+- Basic SQL knowledge
+- Som...
+
+  5. Emily Rodriguez
+     Match Score: 0.62
+     Matched Skills: Python, SQL, AWS, Docker, Git
+     Missing Skills: Databases, Containerization, REST APIs
+     Summary: Emily Rodriguez
+DevOps Engineer
+
+Experience:
+- 7 years of DevOps and infrastructure engineering
+- Ex...
+
+============================================================
+
+
+
+
+============================================================
+CANDIDATE COMPARISON RESULTS
+============================================================
+
+Query: compare john doe and jane smith
+Intent: compare
+JD Summary: Job Title: Python Developer
+
+Requirements:
+- 3+ years of Python experience
+- Strong knowledge of SQL and databases
+- Experience with AWS cloud services
+- Familiarity with Docker and containerization
+-
+Total Resumes Processed: 9
+
+Extracted JD Skills: Python, SQL, Databases, AWS, Docker, Containerization, REST APIs, Git
+
+Shortlist Criteria: Based on the job requirements for the **Python Developer** position, here is a detailed side-by-side comparison of John Doe and Jane Smith.
+
+### **Candidate Comparison Overview**
+
+| Feature | John Doe | Jane Smith |
+| :--- | :--- | :--- |
+| **Overall Match Score** | **88%** | **62%** |
+| **Python Experience** | Matched | Matched |
+| **SQL & Databases** | Matched (Both) | Matched (SQL only) |
+| **C
+
+Candidates Compared:
+
+  1. John Doe
+     Match Score: 0.88
+     Matched Skills: Python, SQL, AWS, Docker, Containerization, REST APIs, Git
+     Missing Skills: Databases
+     Summary: John Doe
+Python Developer
+
+Experience:
+- 5 years of Python development
+- Built REST APIs using Flask...
+
+  2. Jane Smith
+     Match Score: 0.62
+     Matched Skills: Python, SQL, AWS, Docker, Git
+     Missing Skills: Databases, Containerization, REST APIs
+     Summary: Jane Smith
+Software Engineer
+
+Experience:
+- 2 years of Python experience
+- Basic SQL knowledge
